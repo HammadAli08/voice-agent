@@ -1,0 +1,28 @@
+# GUI
+PyQt6
+
+# Audio Processing
+sounddevice
+numpy
+webrtcvad
+
+# Voice Detection & Synthesis
+pvporcupine
+pvrecorder
+edge-tts
+
+# API & LLM
+groq
+openai
+python-dotenv
+requests
+
+# System & Utils
+psutil
+websockets
+rich
+cffi
+platformdirs
+pyyaml
+tqdm
+setuptools

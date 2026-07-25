@@ -1,0 +1,27 @@
+[project]
+name = "voice-agent"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "cffi>=2.0.0",
+    "edge-tts>=7.2.7",
+    "groq>=1.0.0",
+    "numpy>=2.4.1",
+    "openai>=2.15.0",
+    "platformdirs>=4.5.1",
+    "psutil>=7.2.1",
+    "pvporcupine>=4.0.1",
+    "pvrecorder>=1.2.7",
+    "pyqt6>=6.10.2",
+    "python-dotenv>=1.2.1",
+    "pyyaml>=6.0.3",
+    "requests>=2.32.5",
+    "rich>=14.3.1",
+    "setuptools>=80.10.2",
+    "sounddevice>=0.5.5",
+    "tqdm>=4.67.1",
+    "webrtcvad>=2.0.10",
+    "websockets>=16.0",
+]
