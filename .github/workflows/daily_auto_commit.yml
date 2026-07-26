@@ -24,7 +24,7 @@ jobs:
           # This ensures the commit doesn't happen at the exact same minute every day
           DELAY=$((RANDOM % 3600))
           echo "Sleeping for $DELAY seconds to randomize commit time..."
-          sleep $DELAY
+          sleep 5
 
       - name: Set up Python
         uses: actions/setup-python@v5
