@@ -1,178 +1,77 @@
-# 🤖 GitHub Commit Automation
+# 🤖 GitHub Daily Auto-Commit Automation
 
-Automated daily GitHub commits for the **voice-agent** repository.  
-Once set up, you **never need to manually commit or push again**.
+Continuous daily GitHub commits for the **voice-agent** repository using **GitHub Actions**.
 
----
-
-## How It Works
-
-```
-cron (random daily time 09:00–19:00)
-  └─► run_auto_commit.sh      (Bash launcher)
-        ├─ Starts ssh-agent if needed
-        ├─ Loads ~/.ssh/id_ed25519
-        └─► auto_commit.py    (Python core)
-              ├─ Creates/updates activity.txt
-              ├─ git add .
-              ├─ git commit -m "<random message>"
-              └─ git push
-```
-
-### What gets committed
-
-Every day, `activity.txt` receives a new timestamped line such as:
-
-```
-[2026-07-25 14:32:07] Daily maintenance
-[2026-07-26 11:09:43] Repository health check
-```
-
-The commit message is also randomly chosen from a pool, so each day looks organic.
-
-### Monthly schedule rotation
-
-On the **1st of every month at 08:00**, `setup_cron.py` regenerates the cron entry with a **new random time** between 09:00 and 19:00. This keeps the activity pattern non-mechanical.
+Once set up, this repository will automatically commit and push activity daily with zero manual intervention required.
 
 ---
 
-## File Overview
+## 🏗️ Architecture & How It Works
 
-| File | Purpose |
+```
+GitHub Actions Schedule (cron: '0 11 * * *' / 11:00 UTC daily)
+  │
+  ├─► Checkout Repository (fetch-depth: 0)
+  │
+  ├─► Random Delay (0–1800s, scheduled runs only)
+  │
+  ├─► Execute Python Keepalive Generator (scripts/daily_keepalive.py)
+  │     └─ Appends timestamped entry to activity.txt (rolling 365 max)
+  │
+  ├─► Git Staging & Diff Verification
+  │
+  ├─► Commit with Randomized Keepalive Message
+  │
+  └─► Resilient Git Push (Fetch + Rebase + 3x Exponential Backoff Retry)
+```
+
+---
+
+## 📁 Key File Overview
+
+| Path | Purpose |
 |---|---|
-| `auto_commit.py` | Core logic — update file, git add/commit/push |
-| `run_auto_commit.sh` | Bash launcher — SSH agent + key loading |
-| `setup_cron.py` | Cron installer / rotator (idempotent) |
-| `install_automation.sh` | One-time setup — run this first |
-| `activity.txt` | Committed daily activity log |
-| `logs/auto_commit.log` | Python script log |
-| `logs/run_auto_commit.log` | Bash launcher log |
-| `logs/cron_run.log` | Cron execution output |
-| `logs/cron_rotate.log` | Monthly rotation log |
-| `logs/install_automation.log` | Setup script log |
+| `.github/workflows/daily_auto_commit.yml` | GitHub Actions workflow definition |
+| `scripts/daily_keepalive.py` | Python script to update `activity.txt` atomically |
+| `activity.txt` | Timestamped keepalive activity log (rolling max 365 entries) |
+| `README_AUTOMATION.md` | Architecture and maintenance guide |
 
 ---
 
-## Where Logs Are Stored
+## 🔒 Security & Token Permissions
 
-All logs live in the `logs/` directory inside the repository:
-
-```
-voice agent/
-└── logs/
-    ├── auto_commit.log      ← Primary Python log
-    ├── run_auto_commit.log  ← Bash launcher log
-    ├── cron_run.log         ← Cron stdout/stderr
-    ├── cron_rotate.log      ← Monthly rotation log
-    └── install_automation.log
-```
-
-Tail logs in real-time:
-```bash
-tail -f logs/auto_commit.log
-tail -f logs/run_auto_commit.log
-```
+- **Zero Secrets / Keyless**: Uses the standard GitHub Actions automatically generated `GITHUB_TOKEN`.
+- **Minimal Scopes**: Configured explicitly with `permissions: contents: write`.
+- **Environment Isolation**: `.env` and local secret files are strictly ignored via `.gitignore`. `.env.example` contains placeholders only.
 
 ---
 
-## Initial Setup
+## 🚀 Manual Execution & Testing
 
-> Only needed once. The script is fully idempotent.
+You can manually trigger a workflow run at any time without waiting for the scheduled cron:
 
+### Via GitHub CLI (`gh`)
 ```bash
-cd "/home/hammadali08/PycharmProjects/voice agent"
-bash install_automation.sh
+gh workflow run daily_auto_commit.yml
+gh run watch
 ```
 
-This will:
-1. Verify Git, SSH, and remote configuration
-2. Fix anything that's missing
-3. Install the cron job
-4. Run a live end-to-end test
-5. Print a final status report
+### Via GitHub Web UI
+1. Navigate to your repository on GitHub: `https://github.com/HammadAli08/voice-agent`
+2. Click the **Actions** tab.
+3. Select **Daily Auto Commit** from the left sidebar.
+4. Click **Run workflow** -> **Run workflow**.
 
 ---
 
-## How to Disable
+## 🛡️ Reliability & Self-Healing Safeguards
 
-### Pause (remove cron, keep scripts)
-```bash
-# List current crontab
-crontab -l
-
-# Edit and remove the auto_commit lines
-crontab -e
-```
-
-Or remove all auto-commit cron entries in one command:
-```bash
-crontab -l | grep -v "auto_commit" | crontab -
-```
-
-### Re-enable
-```bash
-python3 "/home/hammadali08/PycharmProjects/voice agent/setup_cron.py"
-```
+- **Rebase & Retry**: Handles remote conflicts or concurrent pushes automatically using `git rebase` and up to 3 push retries.
+- **Rolling Log Cap**: Keeps a rolling window of up to 365 entries in `activity.txt` to prevent unbounded repository bloat over years.
+- **Conditional Delay**: Random delay (up to 30 minutes) only applies to scheduled runs. Manual dispatch runs immediately for fast feedback.
+- **Concurrency Control**: `concurrency: group: daily-auto-commit` prevents overlapping workflow executions.
+- **GitHub Inactivity Safeguard Note**: GitHub automatically pauses scheduled workflows on repos with no activity for 60 days. If paused by GitHub, triggering manual dispatch (`gh workflow run`) or making a manual commit immediately re-enables the schedule.
 
 ---
 
-## How to Change the Schedule
-
-### Change frequency (e.g., twice daily)
-Edit `setup_cron.py` → modify the `build_daily_entry()` function.
-
-### Set a specific time (e.g., always 10:30 AM)
-```bash
-crontab -e
-```
-Change the generated line to:
-```
-30 10 * * * bash /path/to/run_auto_commit.sh >> /path/to/logs/cron_run.log 2>&1 # auto_commit_job
-```
-
-### Trigger a manual run
-```bash
-cd "/home/hammadali08/PycharmProjects/voice agent"
-python3 auto_commit.py
-```
-
-Or via the launcher:
-```bash
-bash run_auto_commit.sh
-```
-
----
-
-## Reboot Persistence
-
-Cron jobs survive reboots automatically — no additional `@reboot` entry is needed.
-
-The `run_auto_commit.sh` launcher starts a **new ssh-agent** and loads the key each time it runs (storing the socket path in `~/.ssh/agent-env` for reuse). This ensures the automation works even after a reboot.
-
----
-
-## Troubleshooting
-
-| Problem | Solution |
-|---|---|
-| `Repository not found` | Ensure the GitHub repo exists and the SSH key is added to your GitHub account |
-| `Permission denied (publickey)` | Run `ssh -T git@github.com` — if it fails, re-add your key to GitHub |
-| Cron not running | Check `crontab -l` and ensure cron service is active: `systemctl status crond` |
-| Nothing committed | Check `activity.txt` was written (run `python3 auto_commit.py` manually) |
-| Logs missing | Ensure `logs/` directory exists: `mkdir -p logs` |
-
----
-
-## Verifying the GitHub Push
-
-```bash
-# Check latest local commit
-git log --oneline -5
-
-# Compare with remote
-git fetch && git log --oneline origin/main -5
-```
-
----
-
-*Generated by install_automation.sh — voice-agent repository automation*
+*Verified and maintained by GitHub Actions — voice-agent repository*
