@@ -11,9 +11,11 @@ Once set up, this repository will automatically commit and push activity daily w
 ```
 GitHub Actions Schedule (cron: '0 11 * * *' / 11:00 UTC daily)
   │
+  ├─► Timeout Protection (timeout-minutes: 15)
+  │
   ├─► Checkout Repository (fetch-depth: 0)
   │
-  ├─► Random Delay (0–1800s, scheduled runs only)
+  ├─► Random Delay (0–600s / 0–10 min, scheduled runs only)
   │
   ├─► Execute Python Keepalive Generator (scripts/daily_keepalive.py)
   │     └─ Appends timestamped entry to activity.txt (rolling 365 max)
@@ -22,7 +24,9 @@ GitHub Actions Schedule (cron: '0 11 * * *' / 11:00 UTC daily)
   │
   ├─► Commit with Randomized Keepalive Message
   │
-  └─► Resilient Git Push (Fetch + Rebase + 3x Exponential Backoff Retry)
+  ├─► Resilient Git Push (Fetch + Rebase + 3x Exponential Backoff Retry)
+  │
+  └─► Strict Remote Verification (Confirms LOCAL HEAD == REMOTE origin/main)
 ```
 
 ---
@@ -67,10 +71,19 @@ gh run watch
 ## 🛡️ Reliability & Self-Healing Safeguards
 
 - **Rebase & Retry**: Handles remote conflicts or concurrent pushes automatically using `git rebase` and up to 3 push retries.
-- **Rolling Log Cap**: Keeps a rolling window of up to 365 entries in `activity.txt` to prevent unbounded repository bloat over years.
-- **Conditional Delay**: Random delay (up to 30 minutes) only applies to scheduled runs. Manual dispatch runs immediately for fast feedback.
-- **Concurrency Control**: `concurrency: group: daily-auto-commit` prevents overlapping workflow executions.
-- **GitHub Inactivity Safeguard Note**: GitHub automatically pauses scheduled workflows on repos with no activity for 60 days. If paused by GitHub, triggering manual dispatch (`gh workflow run`) or making a manual commit immediately re-enables the schedule.
+- **Strict Remote Verification**: Asserts that `git rev-parse HEAD` on the runner strictly equals `git rev-parse origin/main` after pushing before reporting success.
+- **Timeout Protection**: `timeout-minutes: 15` ensures stuck network connections or runner hangs terminate cleanly.
+- **Rolling Log Cap**: Keeps a rolling window of up to 365 entries in `activity.txt` to prevent unbounded repository bloat.
+- **Conditional Delay**: Random delay (up to 10 minutes) only applies to scheduled runs. Manual dispatch runs immediately for fast feedback.
+- **Concurrency Protection**: `concurrency: group: daily-auto-commit` prevents overlapping workflow executions.
+
+---
+
+## ⚠️ Platform Limitation Notice & Maintenance
+
+Scheduled workflows on GitHub Actions are subject to GitHub infrastructure policies:
+1. **GitHub Inactivity Policy**: Scheduled workflows pause automatically if a repository has no human or PAT activity for 60 consecutive days. If paused, GitHub sends an email notification; triggering `gh workflow run` or pushing a commit manually reactivates the schedule.
+2. **Infrastructure Outages**: Platform-wide GitHub Actions service disruptions or upstream git service downtime will delay workflow execution until services resume.
 
 ---
 

@@ -13,6 +13,7 @@ concurrency:
 jobs:
   auto-commit:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
       contents: write
 
@@ -25,7 +26,8 @@ jobs:
       - name: Random delay (scheduled runs only)
         if: github.event_name == 'schedule'
         run: |
-          DELAY=$((RANDOM % 1800))
+          # Random delay between 0 and 600 seconds (0-10 minutes)
+          DELAY=$((RANDOM % 600))
           echo "Sleeping for $DELAY seconds to randomize daily commit timestamp..."
           sleep $DELAY
 
@@ -92,8 +94,19 @@ jobs:
             exit 1
           fi
 
-          COMMIT_HASH=$(git rev-parse HEAD)
-          echo "COMMIT_HASH=$COMMIT_HASH" >> $GITHUB_ENV
+          # Post-push strict remote verification
+          echo "Verifying push on remote origin/main..."
+          git fetch origin main
+          LOCAL_HASH=$(git rev-parse HEAD)
+          REMOTE_HASH=$(git rev-parse origin/main)
+
+          if [ "$LOCAL_HASH" != "$REMOTE_HASH" ]; then
+            echo "Post-push verification failed! Local commit ($LOCAL_HASH) != Remote HEAD ($REMOTE_HASH)"
+            exit 1
+          fi
+
+          echo "Post-push verification passed: Local HEAD matches Remote origin/main ($LOCAL_HASH)."
+          echo "COMMIT_HASH=$LOCAL_HASH" >> $GITHUB_ENV
           echo "COMMIT_MSG=$RANDOM_MSG" >> $GITHUB_ENV
           echo "STATUS=success" >> $GITHUB_ENV
 
@@ -106,4 +119,5 @@ jobs:
           if [ "${{ env.STATUS }}" = "success" ]; then
             echo "- **Commit Hash**: \`${{ env.COMMIT_HASH }}\`" >> $GITHUB_STEP_SUMMARY
             echo "- **Commit Message**: \`${{ env.COMMIT_MSG }}\`" >> $GITHUB_STEP_SUMMARY
+            echo "- **Remote Verification**: Passed (Local HEAD matches Remote `origin/main`)" >> $GITHUB_STEP_SUMMARY
           fi
